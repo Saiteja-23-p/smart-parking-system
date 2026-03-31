@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking History - Smart Parking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/index.css">
+</head>
+
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="index.html"><i class="fas fa-parking me-2"></i>SmartParking</a>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto" id="nav-items"></ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <h2 class="fw-bold mb-4">My Booking History</h2>
+
+        <div class="table-responsive card p-4">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Booking ID</th>
+                        <th>Location</th>
+                        <th>Slot</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTable">
+                    <tr>
+                        <td colspan="7" class="text-center py-4">Loading your history...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const tableBody = document.getElementById('historyTable');
+
+            try {
+                const response = await fetch(`/api/bookings/user/${user.id}`);
+                const bks = await response.json();
+
+                tableBody.innerHTML = '';
+                if (bks.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No bookings found.</td></tr>';
+                    return;
+                }
+
+                bks.forEach(b => {
+                    const row = document.createElement('tr');
+                    const isConfirmed = b.status === 'Confirmed';
+
+                    row.innerHTML = `
+                        <td>#SP${b.bookingId}</td>
+                        <td>${b.slot.location.locationName}</td>
+                        <td class="fw-bold text-primary">${b.slot.slotNumber}</td>
+                        <td>${b.bookingDate}</td>
+                        <td>${b.startTime.slice(0, 5)} - ${b.endTime.slice(0, 5)}</td>
+                        <td><span class="badge ${isConfirmed ? 'bg-success' : 'bg-secondary'}">${b.status}</span></td>
+                        <td>
+                            ${isConfirmed ? `<button onclick="cancelBooking(${b.bookingId})" class="btn btn-outline-danger btn-sm">Cancel</button>` : '-'}
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Failed to load history.</td></tr>';
+            }
+        });
+
+        async function cancelBooking(id) {
+            if (!confirm('Are you sure you want to cancel this booking?')) return;
+
+            try {
+                const res = await fetch(`/api/bookings/cancel/${id}`, { method: 'POST' });
+                if (res.ok) {
+                    alert('Booking cancelled successfully');
+                    location.reload();
+                }
+            } catch (err) { alert('Action failed'); }
+        }
+    </script>
+</body>
+
+</html>

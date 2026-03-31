@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Smart Parking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/index.css">
+</head>
+
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="fas fa-solar-panel me-2"></i>Admin Dashboard</a>
+            <div id="nav-items"></div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <div class="row g-4 mb-5">
+            <div class="col-md-4">
+                <div class="card p-4 bg-primary text-white">
+                    <h5>Total Bookings</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <i class="fas fa-calendar-check fa-2x"></i>
+                        <h2 id="totalBookings">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-4 bg-success text-white">
+                    <h5>Available Slots</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <i class="fas fa-parking fa-2x"></i>
+                        <h2 id="totalSlots">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-4 bg-warning text-white">
+                    <h5>Locations</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <i class="fas fa-map-marker-alt fa-2x"></i>
+                        <h2 id="totalLocations">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Management Sections -->
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card p-4 h-100">
+                    <h4 class="fw-bold mb-4">Add Parking Location</h4>
+                    <form id="addLocationForm">
+                        <div class="mb-3">
+                            <label class="form-label">Location Name</label>
+                            <input type="text" id="locName" class="form-control" placeholder="e.g. City Mall" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <input type="text" id="locAddress" class="form-control" placeholder="e.g. 123 Street..."
+                                required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Location</button>
+                    </form>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card p-4 h-100">
+                    <h4 class="fw-bold mb-4">Quick Add Slot</h4>
+                    <form id="addSlotForm">
+                        <div class="mb-3">
+                            <label class="form-label">Select Location</label>
+                            <select id="locSelect" class="form-select" required></select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Slot Number</label>
+                            <input type="text" id="slotNum" class="form-control" placeholder="e.g. A-101" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Slot</button>
+                    </form>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="card p-4 mt-4">
+                    <h4 class="fw-bold mb-4">Recent Bookings</h4>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Location</th>
+                                    <th>Slot</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bookingsTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const admin = localStorage.getItem('admin');
+            if (!admin) {
+                window.location.href = 'admin-login.html';
+                return;
+            }
+
+            loadStats();
+        });
+
+        async function loadStats() {
+            try {
+                // Load Locations
+                const locRes = await fetch('/api/parking/locations');
+                const locs = await locRes.json();
+                document.getElementById('totalLocations').textContent = locs.length;
+
+                const select = document.getElementById('locSelect');
+                select.innerHTML = '';
+                locs.forEach(l => {
+                    const opt = document.createElement('option');
+                    opt.value = l.id;
+                    opt.textContent = l.locationName;
+                    select.appendChild(opt);
+                });
+
+                // Load Bookings
+                const bRes = await fetch('/api/admin/bookings');
+                const bks = await bRes.json();
+                document.getElementById('totalBookings').textContent = bks.length;
+
+                const table = document.getElementById('bookingsTable');
+                table.innerHTML = '';
+                bks.slice(-5).reverse().forEach(b => {
+                    const row = `<tr>
+                        <td>${b.user.name}</td>
+                        <td>${b.slot.location.locationName}</td>
+                        <td>${b.slot.slotNumber}</td>
+                        <td>${b.bookingDate}</td>
+                        <td><span class="badge ${b.status === 'Confirmed' ? 'bg-success' : b.status === 'Completed' ? 'bg-primary' : 'bg-secondary'}">${b.status}</span></td>
+                        <td>
+                            <select class="form-select form-select-sm d-inline-block w-auto" onchange="updateBookingStatus(${b.bookingId}, this.value)">
+                                <option value="" disabled selected>Update</option>
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="Cancelled">Cancelled</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </td>
+                    </tr>`;
+                    table.innerHTML += row;
+                });
+
+            } catch (err) { console.error(err); }
+        }
+
+        document.getElementById('addLocationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                locationName: document.getElementById('locName').value,
+                address: document.getElementById('locAddress').value
+            };
+            const res = await fetch('/api/admin/location', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (res.ok) { alert('Location added'); location.reload(); }
+        });
+
+        document.getElementById('addSlotForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                location: { id: parseInt(document.getElementById('locSelect').value) },
+                slotNumber: document.getElementById('slotNum').value,
+                status: 'Available'
+            };
+            const res = await fetch('/api/admin/slot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (res.ok) { alert('Slot added'); location.reload(); }
+        });
+
+        async function updateBookingStatus(id, status) {
+            if (!confirm('Update booking status to ' + status + '?')) return;
+            try {
+                const res = await fetch(`/api/admin/bookings/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                if (res.ok) {
+                    alert('Status updated successfully');
+                    location.reload();
+                } else {
+                    alert('Failed to update status');
+                }
+            } catch (err) { alert('Action failed'); }
+        }
+    </script>
+</body>
+
+</html>

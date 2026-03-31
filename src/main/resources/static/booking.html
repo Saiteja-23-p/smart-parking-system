@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Slot - Smart Parking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/index.css">
+</head>
+
+<body class="bg-light">
+
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card p-5 fade-in">
+                    <h2 class="fw-bold text-primary mb-4">Complete Your Booking</h2>
+                    <div class="alert alert-info py-2 d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <strong>Selected Slot:</strong> <span id="displaySlot" class="fw-bold"></span>
+                            <span class="badge bg-secondary ms-2" id="displayType"></span>
+                        </div>
+                        <div class="text-end">
+                            <span class="fs-5 fw-bold text-primary" id="displayPrice"></span><span class="small text-muted">/hr</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-light border-0 mb-4">
+                        <div class="card-body py-3 d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Estimated Cost:</span>
+                            <span class="fs-4 fw-bold text-success" id="totalCost">₹0.00</span>
+                        </div>
+                    </div>
+
+                    <form id="bookingForm">
+                        <div class="mb-3">
+                            <label class="form-label">Booking Date</label>
+                            <input type="date" id="bookingDate" class="form-control" required>
+                        </div>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label">Start Time</label>
+                                <input type="time" id="startTime" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">End Time</label>
+                                <input type="time" id="endTime" class="form-control" required>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-3">
+                            <button type="submit" class="btn btn-primary flex-grow-1">Confirm Booking</button>
+                            <a href="view-slots.html" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        const slotId = localStorage.getItem('temp_slot_id');
+        const slotNum = localStorage.getItem('temp_slot_num');
+        const slotPrice = parseFloat(localStorage.getItem('temp_slot_price')) || 50;
+        const slotType = localStorage.getItem('temp_slot_type') || 'Unknown Type';
+        const user = JSON.parse(localStorage.getItem('user'));
+
+        if (!slotId || !user) {
+            window.location.href = 'index.html';
+        }
+
+        document.getElementById('displaySlot').textContent = slotNum;
+        document.getElementById('displayType').textContent = slotType;
+        document.getElementById('displayPrice').textContent = `₹${slotPrice.toFixed(2)}`;
+
+        // Set min date to today
+        document.getElementById('bookingDate').min = new Date().toISOString().split("T")[0];
+
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+        const totalCostDisplay = document.getElementById('totalCost');
+
+        function calculateCost() {
+            if (startTimeInput.value && endTimeInput.value) {
+                const start = new Date(`1970-01-01T${startTimeInput.value}:00`);
+                const end = new Date(`1970-01-01T${endTimeInput.value}:00`);
+                
+                let diffHours = (end - start) / (1000 * 60 * 60);
+                if (diffHours < 0) diffHours += 24; // Handle crossing midnight
+                
+                if (diffHours > 0) {
+                    const cost = diffHours * slotPrice;
+                    totalCostDisplay.textContent = `₹${cost.toFixed(2)}`;
+                } else {
+                    totalCostDisplay.textContent = `₹0.00`;
+                }
+            } else {
+                totalCostDisplay.textContent = `₹0.00`;
+            }
+        }
+
+        startTimeInput.addEventListener('change', calculateCost);
+        endTimeInput.addEventListener('change', calculateCost);
+
+        document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Validate time
+            const start = new Date(`1970-01-01T${startTimeInput.value}:00`);
+            const end = new Date(`1970-01-01T${endTimeInput.value}:00`);
+            if (start >= end && (end - start) / (1000*60*60) > -12) {
+                // simple validation to avoid negative times unless crossing midnight by a lot
+                alert("End time must be after start time");
+                return;
+            }
+
+            let formattedStart = startTimeInput.value;
+            if (formattedStart.length === 5) formattedStart += ":00";
+            
+            let formattedEnd = endTimeInput.value;
+            if (formattedEnd.length === 5) formattedEnd += ":00";
+
+            const bookingData = {
+                userId: user.id,
+                slotId: parseInt(slotId),
+                bookingDate: document.getElementById('bookingDate').value,
+                startTime: formattedStart,
+                endTime: formattedEnd
+            };
+
+            try {
+                const response = await fetch('/api/bookings/book', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookingData)
+                });
+
+                if (response.ok) {
+                    alert('Booking confirmed! An email confirmation has been sent (Mock).');
+                    localStorage.removeItem('temp_slot_id');
+                    localStorage.removeItem('temp_slot_num');
+                    localStorage.removeItem('temp_slot_price');
+                    localStorage.removeItem('temp_slot_type');
+                    window.location.href = 'history.html';
+                } else {
+                    try {
+                        const errObj = await response.json();
+                        alert(`Booking failed. Server says: ${errObj.error || response.statusText}`);
+                    } catch (e) {
+                        const errText = await response.text();
+                        alert(`Booking failed. Server says: ${errText || response.statusText}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Connection failed');
+            }
+        });
+    </script>
+</body>
+
+</html>
