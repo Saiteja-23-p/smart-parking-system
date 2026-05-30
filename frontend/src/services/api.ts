@@ -1,7 +1,9 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? '/api'
+    : 'http://localhost:8080/api',
   headers: {
     'Content-Type': 'application/json',
   },
