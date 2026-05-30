@@ -68,7 +68,7 @@ export const Login: React.FC = () => {
     localStorage.setItem('token', developerToken);
     localStorage.setItem('user', JSON.stringify(devUser));
     
-    window.location.href = '/dashboard';
+    navigate('/dashboard');
   };
 
   const handleAdminBypass = () => {
@@ -85,7 +85,7 @@ export const Login: React.FC = () => {
     localStorage.setItem('token', developerToken);
     localStorage.setItem('user', JSON.stringify(devUser));
     
-    window.location.href = '/admin';
+    navigate('/admin');
   };
 
   return (

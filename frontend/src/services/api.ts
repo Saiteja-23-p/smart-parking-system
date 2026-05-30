@@ -34,7 +34,7 @@ api.interceptors.response.use(
       // Redirect to login gate if we are not on public pages
       const publicPaths = ['/login', '/register', '/'];
       if (!publicPaths.includes(window.location.pathname)) {
-        window.location.href = '/login';
+        window.location.hash = '#/login';
       }
     }
     return Promise.reject(error);
