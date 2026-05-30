@@ -1,65 +1,128 @@
 package com.smartparking.service;
 
+import com.smartparking.dto.BookingDTO;
+import com.smartparking.dto.BookingRequest;
 import com.smartparking.entity.Booking;
 import com.smartparking.entity.ParkingSlot;
+import com.smartparking.entity.User;
+import com.smartparking.exception.ResourceNotFoundException;
+import com.smartparking.exception.SlotUnavailableException;
 import com.smartparking.repository.BookingRepository;
 import com.smartparking.repository.ParkingSlotRepository;
+import com.smartparking.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class BookingService {
+
     @Autowired
     private BookingRepository bookingRepository;
 
     @Autowired
     private ParkingSlotRepository slotRepository;
 
-    @Transactional
-    public Booking createBooking(Booking booking) {
-        // Mark slot as booked
-        ParkingSlot slot = slotRepository.findById(booking.getSlot().getSlotId()).orElseThrow();
-        slot.setStatus("Booked");
-        slotRepository.save(slot);
+    @Autowired
+    private UserRepository userRepository;
 
-        return bookingRepository.save(booking);
-    }
+    @Autowired
+    private ParkingService parkingService;
 
-    @Transactional
-    public String cancelBooking(Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId).orElse(null);
-        if (booking != null) {
-            booking.setStatus("Cancelled");
-            parkingSlotAvailable(booking.getSlot().getSlotId());
-            bookingRepository.save(booking);
-            return "Booking cancelled successfully";
+    public BookingDTO createBooking(String userEmail, BookingRequest request) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        ParkingSlot slot = slotRepository.findById(request.getSlotId())
+                .orElseThrow(() -> new ResourceNotFoundException("Slot not found"));
+
+        if (!"AVAILABLE".equals(slot.getStatus())) {
+            throw new SlotUnavailableException("Slot is not available");
         }
-        return "Booking not found";
+
+        // Calculate hours
+        long hours = Duration.between(request.getStartTime(), request.getEndTime()).toHours();
+        if (hours < 1) hours = 1; // Minimum 1 hour charge
+        double totalAmount = hours * slot.getCurrentDynamicPrice();
+
+        Booking booking = new Booking();
+        booking.setUser(user);
+        booking.setHub(slot.getHub());
+        booking.setSlot(slot);
+        booking.setVehicleNumber(request.getVehicleNumber());
+        booking.setStartTime(request.getStartTime());
+        booking.setEndTime(request.getEndTime());
+        booking.setTotalAmount(totalAmount);
+        booking.setDynamicPriceApplied(slot.getCurrentDynamicPrice());
+        booking.setStatus("ACTIVE");
+        booking.setBookingToken(UUID.randomUUID().toString());
+
+        booking = bookingRepository.save(booking);
+
+        // Update Slot status
+        parkingService.updateSlotStatus(slot.getId(), "RESERVED");
+
+        return mapToDTO(booking);
     }
 
-    private void parkingSlotAvailable(Long slotId) {
-        slotRepository.findById(slotId).ifPresent(slot -> {
-            slot.setStatus("Available");
-            slotRepository.save(slot);
-        });
+    public List<BookingDTO> getUserBookings(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        return bookingRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
     }
 
-    public List<Booking> getBookingsByUser(Long userId) {
-        return bookingRepository.findByUserId(userId);
-    }
-
-    public List<Booking> getAllBookings() {
-        return bookingRepository.findAll();
-    }
-    @Transactional
-    public Booking updateBookingStatus(Long bookingId, String status) {
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Booking not found"));
-        booking.setStatus(status);
-        if (status.equals("Cancelled") || status.equals("Completed")) {
-            parkingSlotAvailable(booking.getSlot().getSlotId());
+    public BookingDTO cancelBooking(String userEmail, Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        
+        if (!booking.getUser().getId().equals(user.getId()) && !"ROLE_ADMIN".equals(user.getRole()) && !"ADMIN".equals(user.getRole())) {
+            throw new RuntimeException("Unauthorized to cancel this booking");
         }
-        return bookingRepository.save(booking);
+
+        if (!"ACTIVE".equals(booking.getStatus())) {
+            throw new RuntimeException("Booking cannot be cancelled as it is already " + booking.getStatus());
+        }
+
+        booking.setStatus("CANCELLED");
+        booking = bookingRepository.save(booking);
+
+        // Update Slot status back to AVAILABLE
+        parkingService.updateSlotStatus(booking.getSlot().getId(), "AVAILABLE");
+
+        return mapToDTO(booking);
+    }
+
+    private BookingDTO mapToDTO(Booking booking) {
+        BookingDTO dto = new BookingDTO();
+        dto.setId(booking.getId());
+        dto.setHubId(booking.getHub().getId());
+        dto.setHubName(booking.getHub().getHubName());
+        dto.setHubAddress(booking.getHub().getAddress());
+        dto.setHubLat(booking.getHub().getLatitude());
+        dto.setHubLng(booking.getHub().getLongitude());
+        dto.setSlotId(booking.getSlot().getId());
+        dto.setSlotNumber(booking.getSlot().getSlotNumber());
+        dto.setFloorLevel(booking.getSlot().getFloorLevel());
+        dto.setVehicleNumber(booking.getVehicleNumber());
+        dto.setStartTime(booking.getStartTime());
+        dto.setEndTime(booking.getEndTime());
+        dto.setTotalAmount(booking.getTotalAmount());
+        dto.setDynamicPriceApplied(booking.getDynamicPriceApplied());
+        dto.setEstimatedWalkingMinutes(booking.getEstimatedWalkingMinutes());
+        dto.setStatus(booking.getStatus());
+        dto.setBookingToken(booking.getBookingToken());
+        dto.setQrScannedAt(booking.getQrScannedAt());
+        dto.setCheckInTime(booking.getCheckInTime());
+        dto.setCheckOutTime(booking.getCheckOutTime());
+        dto.setCreatedAt(booking.getCreatedAt());
+        return dto;
     }
 }

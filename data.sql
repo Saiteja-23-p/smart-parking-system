@@ -1,27 +1,33 @@
 USE smart_parking_db;
 
--- Sample Admin
-INSERT INTO admin (username, password) VALUES ('admin', 'admin123');
+-- Insert Admin User
+INSERT INTO users (name, email, password, phone, role) 
+VALUES ('Super Admin', 'admin@smartparking.com', '$2a$10$c1Aok0W5EPtaBB9uiUs/YuZIzmu789Z3LCLiZ2nybcauEhnC8xxQe', '1234567890', 'ROLE_ADMIN');
+-- Note: Password is 'password123' bcrypt encoded
 
--- Sample Users
-INSERT INTO users (name, email, password, phone, role) VALUES ('John Doe', 'john@example.com', 'password123', '1234567890', 'USER');
-INSERT INTO users (name, email, password, phone, role) VALUES ('Jane Smith', 'jane@example.com', 'password456', '0987654321', 'USER');
+-- Insert User
+INSERT INTO users (name, email, password, phone, role) 
+VALUES ('John Doe', 'user@smartparking.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HCGzGzBOq4uG5h2.c5r7y', '9876543210', 'ROLE_USER');
 
--- Sample Locations
-INSERT INTO parking_location (location_name, address, latitude, longitude) VALUES ('Downtown Metro', '123 Main St, Central District', 37.7749, -122.4194);
-INSERT INTO parking_location (location_name, address, latitude, longitude) VALUES ('City Mall', '456 Retail Ave, Uptown', 34.0522, -118.2437);
-INSERT INTO parking_location (location_name, address, latitude, longitude) VALUES ('Tech Park', '789 innovation Dr, Silicon Valley', 37.3861, -122.0839);
+-- Insert Floors
+INSERT INTO floors (floor_name, level) VALUES ('Ground Floor', 0);
+INSERT INTO floors (floor_name, level) VALUES ('Floor 1', 1);
+INSERT INTO floors (floor_name, level) VALUES ('Floor 2', 2);
 
--- Sample Slots for Downtown Metro (id=1)
-INSERT INTO parking_slot (location_id, slot_number, status, vehicle_type, price_per_hour) VALUES (1, 'A1', 'Available', 'Two-Wheeler', 20.0);
-INSERT INTO parking_slot (location_id, slot_number, status, vehicle_type, price_per_hour) VALUES (1, 'A2', 'Available', 'Four-Wheeler', 50.0);
-INSERT INTO parking_slot (location_id, slot_number, status, vehicle_type, price_per_hour) VALUES (1, 'A3', 'Booked', 'Four-Wheeler', 50.0);
+-- Insert Parking Slots (Ground Floor)
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (1, 'G-01', 'VIP', 'AVAILABLE', 100.0);
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (1, 'G-02', 'VIP', 'AVAILABLE', 100.0);
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (1, 'G-03', 'EMERGENCY', 'AVAILABLE', 0.0);
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (1, 'G-04', 'REGULAR', 'AVAILABLE', 50.0);
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (1, 'G-05', 'REGULAR', 'OCCUPIED', 50.0);
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (1, 'G-06', 'REGULAR', 'AVAILABLE', 50.0);
 
--- Sample Slots for City Mall (id=2)
-INSERT INTO parking_slot (location_id, slot_number, status, vehicle_type, price_per_hour) VALUES (2, 'B1', 'Available', 'Three-Wheeler', 30.0);
-INSERT INTO parking_slot (location_id, slot_number, status, vehicle_type, price_per_hour) VALUES (2, 'B2', 'Available', 'Four-Wheeler', 60.0);
+-- Insert Parking Slots (Floor 1)
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (2, 'F1-01', 'REGULAR', 'AVAILABLE', 40.0);
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (2, 'F1-02', 'REGULAR', 'RESERVED', 40.0);
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (2, 'F1-03', 'REGULAR', 'AVAILABLE', 40.0);
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (2, 'F1-04', 'REGULAR', 'AVAILABLE', 40.0);
 
--- Sample Slots for Tech Park (id=3)
-INSERT INTO parking_slot (location_id, slot_number, status, vehicle_type, price_per_hour) VALUES (3, 'C1', 'Available', 'Two-Wheeler', 15.0);
-INSERT INTO parking_slot (location_id, slot_number, status, vehicle_type, price_per_hour) VALUES (3, 'C2', 'Available', 'Three-Wheeler', 25.0);
-INSERT INTO parking_slot (location_id, slot_number, status, vehicle_type, price_per_hour) VALUES (3, 'C3', 'Available', 'Four-Wheeler', 40.0);
+-- Insert Parking Slots (Floor 2)
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (3, 'F2-01', 'REGULAR', 'AVAILABLE', 30.0);
+INSERT INTO parking_slots (floor_id, slot_number, type, status, price_per_hour) VALUES (3, 'F2-02', 'REGULAR', 'AVAILABLE', 30.0);

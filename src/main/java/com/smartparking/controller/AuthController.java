@@ -1,48 +1,72 @@
 package com.smartparking.controller;
 
+import com.smartparking.dto.AuthResponse;
 import com.smartparking.dto.LoginRequest;
-import com.smartparking.entity.Admin;
+import com.smartparking.dto.RegisterRequest;
 import com.smartparking.entity.User;
-import com.smartparking.service.AdminService;
-import com.smartparking.service.UserService;
+import com.smartparking.repository.UserRepository;
+import com.smartparking.security.CustomUserDetailsService;
+import com.smartparking.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "*")
 public class AuthController {
-    @Autowired
-    private UserService userService;
 
     @Autowired
-    private AdminService adminService;
+    private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @PostMapping("/login")
+    public ResponseEntity<?> createAuthenticationToken(@RequestBody LoginRequest authenticationRequest) throws Exception {
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(authenticationRequest.getEmail(), authenticationRequest.getPassword())
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(java.util.Map.of("message", "Incorrect username or password"));
+        }
+
+        final UserDetails userDetails = userDetailsService.loadUserByUsername(authenticationRequest.getEmail());
+        final String jwt = jwtUtil.generateToken(userDetails);
+        User user = userRepository.findByEmail(authenticationRequest.getEmail()).orElseThrow();
+
+        return ResponseEntity.ok(new AuthResponse(jwt, user.getId(), user.getName(), user.getEmail(), user.getRole()));
+    }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody User user) {
-        if (userService.existsByEmail(user.getEmail())) {
-            return ResponseEntity.badRequest().body("{\"error\": \"Email already registered\"}");
+    public ResponseEntity<?> registerUser(@RequestBody RegisterRequest registerRequest) {
+        if (userRepository.findByEmail(registerRequest.getEmail()).isPresent()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "Error: Email is already in use!"));
         }
-        return ResponseEntity.ok(userService.registerUser(user));
-    }
 
-    @PostMapping("/user/login")
-    public ResponseEntity<?> userLogin(@RequestBody LoginRequest request) {
-        Optional<User> user = userService.login(request.getEmail(), request.getPassword());
-        if (user.isPresent()) {
-            return ResponseEntity.ok(user.get());
-        }
-        return ResponseEntity.status(401).body("Invalid credentials");
-    }
+        User user = new User();
+        user.setName(registerRequest.getName());
+        user.setEmail(registerRequest.getEmail());
+        user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
+        user.setPhone(registerRequest.getPhone());
+        user.setRole("ROLE_USER");
 
-    @PostMapping("/admin/login")
-    public ResponseEntity<?> adminLogin(@RequestBody LoginRequest request) {
-        Optional<Admin> admin = adminService.login(request.getUsername(), request.getPassword());
-        if (admin.isPresent()) {
-            return ResponseEntity.ok(admin.get());
-        }
-        return ResponseEntity.status(401).body("Invalid credentials");
+        userRepository.save(user);
+
+        return ResponseEntity.ok(java.util.Map.of("message", "User registered successfully!"));
     }
 }
